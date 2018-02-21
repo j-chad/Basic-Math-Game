@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <form method="post" action="/login">
+        {{ form.hidden_tag() }}
+        {{ form.username.label }} {{ form.username() }}
+        {% if form.username.errors %}
+            <ul class="errors">
+                {% for error in form.username.errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {{ form.password.label }} {{ form.password() }}
+        {% if form.password.errors %}
+            <ul class="errors">
+                {% for error in form.password.errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {{ form.school.label }} {{ form.school() }}
+        {% if form.school.errors %}
+            <ul class="errors">
+                {% for error in form.school.errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        <input type="submit" value="Go">
+    </form>
+    <a href="/register">Register Instead</a>
+</body>
+</html>
