@@ -1,0 +1,53 @@
+#grid-container {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    padding: 10px;
+}
+
+#grid-container > .item{
+    height: calc(12.5vw - 5px);
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    border-radius: 5px;
+}
+
+#add-card{
+    border: dashed black;
+    position: relative;
+    -webkit-transition: border-color 0.1s;
+    -moz-transition: border-color 0.1s;
+    -ms-transition: border-color 0.1s;
+    -o-transition: border-color 0.1s;
+    transition: border-color 0.1s;
+}
+
+#add-card:hover{
+    border-color: #AAA;
+    cursor: pointer;
+}
+
+#add-card > img{
+    position: absolute;
+    width: 50%;
+    height: 50%;
+    top: 25%;
+    left: 25%;
+    -webkit-transition: -webkit-transform 0.2s;
+    -moz-transition: -moz-transform 0.2s;
+    -ms-transition: -ms-transform 0.2s;
+    -o-transition: -o-transform 0.2s;
+    transition: transform 0.2s;
+}
+
+#add-card:hover > img{
+    -webkit-transform: rotate(90deg);
+    -moz-transform: rotate(90deg);
+    -ms-transform: rotate(90deg);
+    -o-transform: rotate(90deg);
+    transform: rotate(90deg);
+    fill: #aaa
+}
+
+.swal2-title, .swal2-progresscircle, .swal2-styled{
+    font-family: Raleway, sans-serif;
+}

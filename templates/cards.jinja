@@ -1,0 +1,25 @@
+{% extends 'helpers/base.jinja' %}
+{% import 'helpers/macros.jinja' as macros %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='cards.css') }}">
+    <script src="{{ url_for('static', filename='sweetalert.js') }}"></script>
+    <script src="{{ url_for('static', filename='cards.js') }}"></script>
+{% endblock %}
+
+{% block nav %}
+    {{ macros.nav(
+        ("Cards", "/cards", "active"),
+        ("Play", "/play"),
+        ("Logout", "/logout", "right")
+    ) }}
+{% endblock %}
+
+{% block content %}
+    <div id="grid-container">
+        <div class="item" id="add-card" onclick="addCardPrompt()">
+            <img src="{{ url_for('static', filename='icons8-plus.svg') }}" alt="Add Card">
+        </div>
+    </div>
+{% endblock %}

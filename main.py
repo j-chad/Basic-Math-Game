@@ -56,7 +56,6 @@ def state_handler(definition):
                 ','.join(request.accept_charsets.values()),
                 ','.join(request.accept_encodings.values()),
                 ','.join(request.accept_languages.values()),
-                ','.join(request.accept_mimetypes.values()),
                 request.user_agent.string
             ]).encode()
         ).hexdigest()
@@ -126,6 +125,7 @@ class School(db.Model, Model):
 class User(db.Model, Model):
     __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True)
+    cards = db.relationship('Card')
     school_id = db.Column(db.Integer, db.ForeignKey('school.id'), nullable=False)
     school = db.relationship('School', back_populates="students")
     state = db.relationship('State', back_populates="user")
@@ -157,12 +157,21 @@ class User(db.Model, Model):
         return bcrypt.check_password_hash(self.password, salted_password)
 
 
-class Question(db.Model, Model):
-    __tablename__ = "question"
+class Card(db.Model, Model):
+    __tablename__ = "card"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.column
-    text = db.Column(db.String(30), nullable=False)
-    answer = db.Column(db.Numeric, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User')
+    question = db.Column(db.String(30), nullable=False)
+    answer = db.Column(db.String(30), nullable=False)
+
+    def __init__(self, user, question, answer):
+        self.user = user
+        self.question = question
+        self.answer = answer
+
+    def render(self):
+        return self.question
 
 
 ##########
@@ -230,6 +239,7 @@ def login(state):
         user = User.query.filter_by(username=form.username.data,
                                     school=form.school.data).first()
         state.user = user
+        db.session.commit()
         return flask.redirect('/cards')
     else:
         return flask.render_template('login.jinja', form=form)
@@ -247,6 +257,26 @@ def register(state):
         return flask.redirect('/cards')
     else:
         return flask.render_template('register.jinja', form=form)
+
+
+@app.route('/cards', methods=('GET', 'POST'))
+@state_handler
+def cards(state):
+    if state.user is None:
+        flask.abort(403)
+    else:
+        return flask.render_template("cards.jinja", user=state.user)
+
+
+@app.route('/api/add_card', methods=('POST',))
+@state_handler
+def add_card(state):
+    q = flask.request.form.get('q')
+    a = flask.request.form.get('a')
+    card = Card(state.user, q, a)
+    db.session.add(card)
+    db.session.commit()
+    return card.render()
 
 
 if __name__ == '__main__':
