@@ -80,6 +80,17 @@ def state_handler(definition):
     return wrapper
 
 
+# This wrapper must be listed after @state_handler
+def require_login(definition):
+    @functools.wraps(definition)
+    def wrapper(state, *args, **kwargs):
+        if state.user is None:
+            flask.abort(403)
+        else:
+            return definition(*args, **kwargs, state=state)
+    return wrapper
+
+
 ############
 # DATABASE #
 ############
@@ -287,6 +298,13 @@ def cards(state):
         flask.abort(403)
     else:
         return flask.render_template("cards.jinja", user=state.user)
+
+
+@app.route('/play', methods=('GET',))
+@state_handler
+@require_login
+def play(state):
+    return 'wow it worked'
 
 
 @app.route('/api/add_card', methods=('POST',))
