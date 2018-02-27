@@ -243,6 +243,8 @@ def index(state):
 @app.route('/login', methods=('GET', 'POST'))
 @state_handler
 def login(state):
+    if state.user is not None:
+        return flask.redirect('/cards')
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data,
@@ -257,6 +259,8 @@ def login(state):
 @app.route('/register', methods=('GET', 'POST'))
 @state_handler
 def register(state):
+    if state.user is not None:
+        return flask.redirect('/cards')
     form = RegisterForm()
     if form.validate_on_submit():
         user = User(form.username.data, form.password.data, form.school.data)
@@ -266,6 +270,14 @@ def register(state):
         return flask.redirect('/cards')
     else:
         return flask.render_template('register.jinja', form=form)
+
+
+@app.route('/logout', methods=('GET',))
+@state_handler
+def logout(state):
+    state.user = None
+    db.session.commit()
+    return flask.redirect('/', 302)
 
 
 @app.route('/cards', methods=('GET', 'POST'))
