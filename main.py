@@ -171,7 +171,16 @@ class Card(db.Model, Model):
         self.answer = answer
 
     def render(self):
-        return self.question
+        return "<div class='container'>" \
+               "<div class='title'>" \
+               "<h1 class='item-text'>{q}</h1>" \
+               "</div>" \
+               "<div class='delete'>" \
+               "<img src='{del_img}' alt='Delete' onclick='deleteCard(this);' data-id={id}>" \
+               "</div></div>".format(q=self.question,
+                                     a=self.answer,
+                                     del_img=flask.url_for('static', filename='delete.svg'),
+                                     id=self.id)
 
 
 ##########
@@ -276,7 +285,20 @@ def add_card(state):
     card = Card(state.user, q, a)
     db.session.add(card)
     db.session.commit()
+    print(q, card.question)
     return card.render()
+
+
+@app.route('/api/remove_card', methods=('POST',))
+@state_handler
+def remove_card(state):
+    card = Card.query.get(flask.request.form.get('id'))
+    if card in state.user.cards:
+        db.session.delete(card)
+        db.session.commit()
+        return 'success', 200
+    else:
+        flask.abort(403)
 
 
 if __name__ == '__main__':

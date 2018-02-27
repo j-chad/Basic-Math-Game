@@ -4,6 +4,7 @@
 {% block head %}
     {{ super() }}
     <link rel="stylesheet" href="{{ url_for('static', filename='cards.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js/2.4.1/core.js"></script>
     <script src="{{ url_for('static', filename='sweetalert.js') }}"></script>
     <script src="{{ url_for('static', filename='cards.js') }}"></script>
 {% endblock %}
@@ -18,6 +19,11 @@
 
 {% block content %}
     <div id="grid-container">
+        {% for card in user.cards %}
+            <div class="item">
+                {{ card.render() }}
+            </div>
+        {% endfor %}
         <div class="item" id="add-card" onclick="addCardPrompt()">
             <img src="{{ url_for('static', filename='icons8-plus.svg') }}" alt="Add Card">
         </div>
