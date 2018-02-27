@@ -1,0 +1,8 @@
+{% macro nav() %}
+    {# Data Format: nav(('Home', 'home', 'active'), ('Login', '/login')) #}
+    {% for link in varargs %}
+        <li{% if link|length > 2 %} class="{% for class in link[2:] %}{{ class }}{% if not loop.last %} {% endif %}{% endfor %}"{% endif %}>
+            <a href="{{ link[1] }}">{{ link[0] }}</a>
+        </li>
+    {% endfor %}
+{% endmacro %}
