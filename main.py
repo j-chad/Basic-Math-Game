@@ -116,7 +116,7 @@ class State(db.Model, Model):
     def __init__(self, request_hash, user=None):
         self.id = self.generate_id()
         self.request_hash = request_hash
-        self._current_card_seed = datetime.datetime.now().microsecond % 4000
+        self._current_card_seed = datetime.datetime.now().microsecond
         if user is not None:
             self.user = user
 
@@ -130,9 +130,11 @@ class State(db.Model, Model):
             return card_order[self._current_card_iter]
 
     def next_card(self):
-        if self._current_card_iter + 1 > len(self.user.cards):
+        if self._current_card_iter is None:
+            self._current_card_iter = 0
+        elif self._current_card_iter + 1 > len(self.user.cards):
             # Generate new seed
-            self._current_card_seed = datetime.datetime.now().microsecond % 4000
+            self._current_card_seed = datetime.datetime.now().microsecond
             self._current_card_iter = 0
         else:
             self._current_card_iter += 1
