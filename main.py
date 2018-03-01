@@ -6,6 +6,7 @@ import uuid
 import random
 
 import click
+import datetime
 import flask
 import flask_bcrypt
 import flask_sqlalchemy
@@ -108,15 +109,35 @@ class State(db.Model, Model):
     request_hash = db.Column(db.String(64), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, default=None)
     user = db.relationship('User', uselist=False)
-    current_card_id = db.Column(db.Integer, db.ForeignKey('card.id'), nullable=True, default=None)
-    current_card = db.relationship('Card', uselist=False)
+    _current_card_seed = db.Column(db.SmallInteger, nullable=False)
+    _current_card_iter = db.Column(db.Integer, nullable=True, default=None)
     score = db.Column(db.Integer, default=0)
 
     def __init__(self, request_hash, user=None):
         self.id = self.generate_id()
         self.request_hash = request_hash
+        self._current_card_seed = datetime.datetime.now().microsecond % 4000
         if user is not None:
             self.user = user
+
+    @hybrid_property
+    def card(self):
+        random.seed(self.id)
+        card_order = random.sample(self.user.cards, len(self.user.cards))
+        if self._current_card_iter is None:
+            return None
+        else:
+            return card_order[self._current_card_iter]
+
+    def next_card(self):
+        if self._current_card_iter + 1 > len(self.user.cards):
+            # Generate new seed
+            self._current_card_seed = datetime.datetime.now().microsecond % 4000
+            self._current_card_iter = 0
+        else:
+            self._current_card_iter += 1
+        db.session.commit()
+        return self.card
 
     @staticmethod
     def generate_id():
@@ -181,8 +202,8 @@ class Card(db.Model, Model):
 
     def __init__(self, user, question, answer):
         self.user = user
-        self.question = question
-        self.answer = answer
+        self.question = question.strip()
+        self.answer = answer.strip()
 
     def render(self):
         return "<div class='container'>" \
@@ -305,6 +326,9 @@ def cards(state):
 @state_handler
 @require_login
 def play(state):
+    state.score = 0
+    state._current_card_iter = None
+    db.session.commit()
     return flask.render_template('game.jinja', state=state)
 
 
@@ -312,8 +336,8 @@ def play(state):
 @state_handler
 @require_login
 def add_card(state):
-    q = flask.request.form.get('q')
-    a = flask.request.form.get('a')
+    q = flask.request.form['q']
+    a = flask.request.form['a']
     card = Card(state.user, q, a)
     db.session.add(card)
     db.session.commit()
@@ -324,7 +348,7 @@ def add_card(state):
 @state_handler
 @require_login
 def remove_card(state):
-    card = Card.query.get(flask.request.form.get('id'))
+    card = Card.query.get(flask.request.form['id'])
     if card in state.user.cards:
         db.session.delete(card)
         db.session.commit()
@@ -337,14 +361,31 @@ def remove_card(state):
 @state_handler
 @require_login
 def get_card(state):
-    card = random.choice(state.user.cards)
-    payload = {
-        "question" : card.question,
-        "id"       : card.id,
-        "score"    : state.score,
-        "highscore": state.user.highscore
-    }
-    return flask.jsonify(payload)
+    card = state.card
+    if state.card is None:
+        state.next_card()
+    return flask.jsonify(dict(id=state.card.id, question=state.card.question))
+
+
+@app.route('/api/answer_card', methods=('POST',))
+@state_handler
+@require_login
+def answer_card(state):
+    answer = flask.request.form['a']
+    answer_formatted = answer.lower().strip()
+    if answer_formatted == state.card.answer.lower():
+        state.score += 1
+        state.next_card()
+        db.session.commit()
+        return flask.jsonify({
+            "correct": True,
+            "score": state.score
+        })
+    else:
+        return flask.jsonify({
+            "correct": False,
+            "score"  : state.score
+        })
 
 
 if __name__ == '__main__':
