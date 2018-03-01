@@ -1,0 +1,23 @@
+{% extends 'helpers/base.jinja' %}
+{% import 'helpers/macros.jinja' as macros %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='game.css') }}"/>
+<script src="{{ url_for('static', filename='game.js') }}"></script>
+{% endblock %}
+
+{% block nav %}
+    {{ macros.nav(
+        ("Cards", "/cards"),
+        ("Play", "/play", "active"),
+        ("Logout", "/logout", "right")
+    ) }}
+{% endblock %}
+
+{% block content %}
+    <div id='game'>
+        <h1>Loading...</h1>
+        <input id="answer" type="text" title="Answer" disabled>
+    </div>
+{% endblock %}

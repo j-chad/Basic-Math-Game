@@ -3,6 +3,7 @@ import functools
 import hashlib
 import os
 import uuid
+import random
 
 import click
 import flask
@@ -12,7 +13,6 @@ import flask_wtf
 import wtforms
 from wtforms.ext.sqlalchemy.fields import QuerySelectField
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
-
 
 #######################
 # APPLICATION CONFIG #
@@ -88,6 +88,7 @@ def require_login(definition):
             flask.abort(403)
         else:
             return definition(*args, **kwargs, state=state)
+
     return wrapper
 
 
@@ -97,8 +98,8 @@ def require_login(definition):
 
 class Model:
     @classmethod
-    def id_exists(cls, id):
-        return cls.query.get(id) is not None
+    def id_exists(cls: db.Model, id_):
+        return cls.query.get(id_) is not None
 
 
 class State(db.Model, Model):
@@ -106,7 +107,9 @@ class State(db.Model, Model):
     id = db.Column(db.String(64), primary_key=True)
     request_hash = db.Column(db.String(64), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, default=None)
-    user = db.relationship('User', uselist=False, back_populates="state")
+    user = db.relationship('User', uselist=False)
+    current_card_id = db.Column(db.Integer, db.ForeignKey('card.id'), nullable=True, default=None)
+    current_card = db.relationship('Card', uselist=False)
     score = db.Column(db.Integer, default=0)
 
     def __init__(self, request_hash, user=None):
@@ -293,34 +296,33 @@ def logout(state):
 
 @app.route('/cards', methods=('GET', 'POST'))
 @state_handler
+@require_login
 def cards(state):
-    if state.user is None:
-        flask.abort(403)
-    else:
-        return flask.render_template("cards.jinja", user=state.user)
+    return flask.render_template("cards.jinja", user=state.user)
 
 
 @app.route('/play', methods=('GET',))
 @state_handler
 @require_login
 def play(state):
-    return 'wow it worked'
+    return flask.render_template('game.jinja', state=state)
 
 
 @app.route('/api/add_card', methods=('POST',))
 @state_handler
+@require_login
 def add_card(state):
     q = flask.request.form.get('q')
     a = flask.request.form.get('a')
     card = Card(state.user, q, a)
     db.session.add(card)
     db.session.commit()
-    print(q, card.question)
     return card.render()
 
 
 @app.route('/api/remove_card', methods=('POST',))
 @state_handler
+@require_login
 def remove_card(state):
     card = Card.query.get(flask.request.form.get('id'))
     if card in state.user.cards:
@@ -329,6 +331,20 @@ def remove_card(state):
         return 'success', 200
     else:
         flask.abort(403)
+
+
+@app.route('/api/get_card', methods=('GET',))
+@state_handler
+@require_login
+def get_card(state):
+    card = random.choice(state.user.cards)
+    payload = {
+        "question" : card.question,
+        "id"       : card.id,
+        "score"    : state.score,
+        "highscore": state.user.highscore
+    }
+    return flask.jsonify(payload)
 
 
 if __name__ == '__main__':
