@@ -81,7 +81,3 @@
     transform: rotate(90deg);
     fill: #aaa
 }
-
-.swal2-title, .swal2-progresscircle, .swal2-styled{
-    font-family: Raleway, sans-serif;
-}

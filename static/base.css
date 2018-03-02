@@ -63,3 +63,7 @@ nav > ul > li.right {
 main{
     height: calc(100% - 4.5em);
 }
+
+.swal2-title, .swal2-progresscircle, .swal2-styled {
+    font-family: Raleway, sans-serif;
+}

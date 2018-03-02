@@ -23,6 +23,7 @@ app = flask.Flask(__name__)
 app.config["SECRET_KEY"] = "]\x9f\xad\xbe\xc9\xfc\r\xc9(u\x91\x82P\xe8\xa5\x10\x13\x982-\x1b\x90^\x18W\x0c\xea\x8e)8x0"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///testing.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["ENABLE_BROWSER_HASH_CHECK"] = False
 db = flask_sqlalchemy.SQLAlchemy(app)
 bcrypt = flask_bcrypt.Bcrypt(app)
 
@@ -61,13 +62,22 @@ def state_handler(definition):
             ]).encode()
         ).hexdigest()
 
+    def hash_matches(a ,b):
+        if app.config.get('ENABLE_BROWSER_HASH_CHECK', True):
+            if a == b:
+                return True
+            else:
+                return False
+        else:
+            return True
+
     @functools.wraps(definition)
     def wrapper(*args, **kwargs):
         state_id = flask.request.cookies.get("game-state")
         hashed_request = hash_request(flask.request)
         if state_id is not None \
                 and State.id_exists(state_id) \
-                and State.query.get(state_id).request_hash == hashed_request:
+                and hash_matches(State.query.get(state_id).request_hash, hashed_request):
             state = State.query.get(state_id)
         else:
             state = State(hashed_request)
@@ -122,7 +132,7 @@ class State(db.Model, Model):
 
     @hybrid_property
     def card(self):
-        random.seed(self.id)
+        random.seed(self._current_card_seed)
         card_order = random.sample(self.user.cards, len(self.user.cards))
         if self._current_card_iter is None:
             return None
@@ -132,7 +142,7 @@ class State(db.Model, Model):
     def next_card(self):
         if self._current_card_iter is None:
             self._current_card_iter = 0
-        elif self._current_card_iter + 1 > len(self.user.cards):
+        elif self._current_card_iter + 1 >= len(self.user.cards):
             # Generate new seed
             self._current_card_seed = datetime.datetime.now().microsecond
             self._current_card_iter = 0
@@ -363,10 +373,11 @@ def remove_card(state):
 @state_handler
 @require_login
 def get_card(state):
-    card = state.card
-    if state.card is None:
-        state.next_card()
-    return flask.jsonify(dict(id=state.card.id, question=state.card.question))
+    if int(flask.request.args.get('n')) == 1:
+        card = state.next_card()
+    else:
+        card = state.card
+    return flask.jsonify(dict(id=card.id, question=card.question))
 
 
 @app.route('/api/answer_card', methods=('POST',))
@@ -386,7 +397,8 @@ def answer_card(state):
     else:
         return flask.jsonify({
             "correct": False,
-            "score"  : state.score
+            "score"  : state.score,
+            "answer" : state.card.answer
         })
 
 

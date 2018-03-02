@@ -2,9 +2,10 @@
 {% import 'helpers/macros.jinja' as macros %}
 
 {% block head %}
-{{ super() }}
-<link rel="stylesheet" href="{{ url_for('static', filename='game.css') }}"/>
-<script src="{{ url_for('static', filename='game.js') }}"></script>
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='game.css') }}"/>
+    <script src="{{ url_for('static', filename='sweetalert.js') }}"></script>
+    <script src="{{ url_for('static', filename='game.js') }}"></script>
 {% endblock %}
 
 {% block nav %}
@@ -16,8 +17,10 @@
 {% endblock %}
 
 {% block content %}
-    <div id='game'>
-        <h1>Loading...</h1>
-        <input id="answer" type="text" title="Answer" disabled>
+    <h1 id="score">0</h1>
+    <div id='card'>
+        <h1 id="card-title">Loading...</h1>
+        <input type="text" id="card-answer" title="answer" placeholder="Answer">
+        <button id="card-submit" onclick="submit(this)" data-id=null disabled>Ok</button>
     </div>
 {% endblock %}
