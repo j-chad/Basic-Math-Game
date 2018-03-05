@@ -76,7 +76,7 @@ function addCardPrompt() {
 }
 
 function deleteCard(card) {
-    let id = card.dataset.id
+    let id = card.dataset.id;
     swal({
         titleText: "Deleting...",
         allowOutsideClick: false,

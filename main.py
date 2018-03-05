@@ -1,20 +1,20 @@
 import base64
+import datetime
 import functools
 import hashlib
 import os
-import uuid
 import random
+import uuid
 
 import click
-import datetime
 import flask
 import flask_bcrypt
 import flask_sqlalchemy
 import flask_wtf
 import wtforms
-from wtforms.ext.sqlalchemy.fields import QuerySelectField
-from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.dialects.mysql import MEDIUMINT
+from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
+from wtforms.ext.sqlalchemy.fields import QuerySelectField
 
 #######################
 # APPLICATION CONFIG #
@@ -66,7 +66,7 @@ def state_handler(definition):
             ]).encode()
         ).hexdigest()
 
-    def hash_matches(a ,b):
+    def hash_matches(a, b):
         if app.config.get('ENABLE_BROWSER_HASH_CHECK', True):
             if a == b:
                 return True
@@ -260,6 +260,7 @@ class LoginForm(flask_wtf.FlaskForm):
                 return True
 
 
+# noinspection PyUnusedLocal
 class RegisterForm(flask_wtf.FlaskForm):
     username = wtforms.StringField("Username", validators=[wtforms.validators.DataRequired(),
                                                            wtforms.validators.Length(max=10)])
@@ -395,7 +396,7 @@ def answer_card(state):
         db.session.commit()
         return flask.jsonify({
             "correct": True,
-            "score": state.score
+            "score"  : state.score
         })
     else:
         payload = {
