@@ -140,9 +140,7 @@ class State(db.Model, Model):
             return card_order[self._current_card_iter]
 
     def next_card(self):
-        if self._current_card_iter is None:
-            self._current_card_iter = 0
-        elif self._current_card_iter + 1 >= len(self.user.cards):
+        if self._current_card_iter is None or self._current_card_iter + 1 >= len(self.user.cards):
             # Generate new seed
             self._current_card_seed = datetime.datetime.now().microsecond
             self._current_card_iter = 0
@@ -395,12 +393,16 @@ def answer_card(state):
             "score": state.score
         })
     else:
-        return flask.jsonify({
-            "correct": False,
-            "score"  : state.score,
-            "answer" : state.card.answer,
+        payload = {
+            "correct"  : False,
+            "score"    : state.score,
+            "answer"   : state.card.answer,
             "highscore": state.user.highscore,
-        })
+        }
+        if state.score > state.user.highscore:
+            state.user.highscore = state.score
+            db.session.commit()
+        return flask.jsonify(payload)
 
 
 if __name__ == '__main__':

@@ -24,6 +24,7 @@ function apply_card(value){
     title.innerText = value.question;
     button.dataset.id = value.id;
     button.disabled = false;
+    document.getElementById('card-answer').value = "";
 }
 
 function submit(){
@@ -107,4 +108,10 @@ document.addEventListener('DOMContentLoaded', function () {
             timer: 2500
         });
     });
+});
+
+document.addEventListener("keyup", event => {
+    if (event.key === "Enter"
+        && !swal.isVisible()
+        && document.getElementById('card-answer') === document.activeElement) submit();
 });
