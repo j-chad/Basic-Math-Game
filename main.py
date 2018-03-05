@@ -223,7 +223,7 @@ class Card(db.Model, Model):
                "<h1 class='item-text'>{q}</h1>" \
                "</div>" \
                "<div class='delete'>" \
-               "<img src='{del_img}' alt='Delete' onclick='deleteCard(this);' data-id={id}>" \
+               "<img src='{del_img}' alt='Delete' onclick='deleteCard();'>" \
                "</div></div>".format(q=self.question,
                                      a=self.answer,
                                      del_img=flask.url_for('static', filename='delete.svg'),
@@ -398,7 +398,8 @@ def answer_card(state):
         return flask.jsonify({
             "correct": False,
             "score"  : state.score,
-            "answer" : state.card.answer
+            "answer" : state.card.answer,
+            "highscore": state.user.highscore,
         })
 
 
