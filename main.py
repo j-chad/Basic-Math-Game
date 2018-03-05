@@ -14,14 +14,14 @@ import flask_wtf
 import wtforms
 from wtforms.ext.sqlalchemy.fields import QuerySelectField
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
+from sqlalchemy.dialects.mysql import MEDIUMINT
 
 #######################
 # APPLICATION CONFIG #
 ######################
 
-app = flask.Flask(__name__)
-app.config["SECRET_KEY"] = "]\x9f\xad\xbe\xc9\xfc\r\xc9(u\x91\x82P\xe8\xa5\x10\x13\x982-\x1b\x90^\x18W\x0c\xea\x8e)8x0"
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///testing.db"
+app = flask.Flask(__name__, instance_relative_config=True)
+app.config.from_pyfile('config.py')
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["ENABLE_BROWSER_HASH_CHECK"] = False
 db = flask_sqlalchemy.SQLAlchemy(app)
@@ -38,7 +38,11 @@ def make_shell_context():
 
 
 @app.cli.command()
-def add_schools():
+def init():
+    db.drop_all()
+    click.echo("Dropped All Tables")
+    db.create_all()
+    click.echo("Created All Tables")
     schools = (
         "Sancta Maria College",
         "Sancta Maria Primary",
@@ -119,7 +123,7 @@ class State(db.Model, Model):
     request_hash = db.Column(db.String(64), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, default=None)
     user = db.relationship('User', uselist=False)
-    _current_card_seed = db.Column(db.SmallInteger, nullable=False)
+    _current_card_seed = db.Column(MEDIUMINT(unsigned=True), nullable=False)
     _current_card_iter = db.Column(db.Integer, nullable=True, default=None)
     score = db.Column(db.Integer, default=0)
 
@@ -221,7 +225,7 @@ class Card(db.Model, Model):
                "<h1 class='item-text'>{q}</h1>" \
                "</div>" \
                "<div class='delete'>" \
-               "<img src='{del_img}' alt='Delete' onclick='deleteCard();'>" \
+               "<img src='{del_img}' alt='Delete' onclick='deleteCard(this);' data-id={id}>" \
                "</div></div>".format(q=self.question,
                                      a=self.answer,
                                      del_img=flask.url_for('static', filename='delete.svg'),
@@ -359,6 +363,7 @@ def add_card(state):
 @require_login
 def remove_card(state):
     card = Card.query.get(flask.request.form['id'])
+    print(card, state.user.cards)
     if card in state.user.cards:
         db.session.delete(card)
         db.session.commit()
@@ -399,7 +404,7 @@ def answer_card(state):
             "answer"   : state.card.answer,
             "highscore": state.user.highscore,
         }
-        if state.score > state.user.highscore:
+        if state.user.highscore is None or state.score > state.user.highscore:
             state.user.highscore = state.score
             db.session.commit()
         return flask.jsonify(payload)

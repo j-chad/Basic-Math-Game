@@ -61,7 +61,7 @@ function submit(){
                     /** @namespace response.highscore */
                     if(response.highscore == null){
                         text = `New Highscore!`;
-                    }else if(response.score >= response.highscore){
+                    }else if(response.score > response.highscore){
                         text = `New Highscore! (${response.score} > ${response.highscore})`;
                     } else {
                         text = `You were ${response.highscore - response.score} points away from your highscore!`;
