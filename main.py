@@ -95,52 +95,12 @@ def state_handler(definition: Callable) -> Callable:
     Each callable that is wrapped with this handler will recieve the current requests state.
     When the callable has returned its response, it is intercepted and assigned cookies.
 
-    If the application config `ENABLE_BROWSER_HASH_CHECK` is True, then some request values will be hashed and rejected
-    if the state holds a different value. This can make it harder for malicious users to stealing cookies, but is turned
-    off by default as it is currently unstable due to javascript XMLHttpRequests having different headers.
-
     Args:
         definition (callable): A callable which operates within a flask.request context. Will be passed `state`.
 
     Returns:
         flask.Response: The response returned by `definition`, but wrapped with appropriate cookies.
     """
-
-    def hash_request(request: flask.request) -> str:
-        """Hashes A Request To Determine if it originates from the same computer
-
-        Args:
-            request (flask.request): A request context provided by flask
-
-        Returns:
-            str: hexadecimal representation of a sha256 hash
-        """
-        return hashlib.sha256(
-            ''.join([
-                request.host,
-                ','.join(request.accept_charsets.values()),
-                ','.join(request.accept_encodings.values()),
-                ','.join(request.accept_languages.values()),
-                request.user_agent.string
-            ]).encode()
-        ).hexdigest()
-
-    def hash_matches(a: str, b: str) -> bool:
-        """Simply Determines Whether A is Equal To B
-
-        Todo: This function should be made to be constant time to prevent possible timing attacks
-
-        Args:
-            a (str)
-            b (str)
-
-        Returns:
-            True if a==b or if `ENABLE_BROWSER_HASH_CHECK` is True
-        """
-        if a == b or app.config.get('ENABLE_BROWSER_HASH_CHECK', False):
-            return True
-        else:
-            return False
 
     @functools.wraps(definition)
     def wrapper(*args, **kwargs) -> flask.Response:
@@ -150,15 +110,12 @@ def state_handler(definition: Callable) -> Callable:
             flask.Response with all cookies wrapped
         """
         state_id = flask.request.cookies.get("game-state")
-        hashed_request = hash_request(flask.request)
-        if state_id is not None \
-                and State.id_exists(state_id) \
-                and hash_matches(State.query.get(state_id).request_hash, hashed_request):
+        if state_id is not None and State.id_exists(state_id):
             # if state is valid, get it from the database
             state = State.query.get(state_id)
         else:
             # if it isn't valid, create a new State object
-            state = State(hashed_request)
+            state = State()
             db.session.add(state)
             db.session.commit()
         # pass state to definition and get response
@@ -223,7 +180,6 @@ class State(db.Model, Model):
 
     Columns:
         id: The primary key. This is sent to the browser as a cookie to identify across requests
-        request_hash: The hashed request. See the docstring on `state_handler` for more information.
         user_id: Pretty self explanatory. Holds the identifier for the user if they are logged in.
         _current_card_seed: The initial seed for the randomness to shuffle the cards
         _current_card_iter: The current card of the shuffled set. (zero indexed)
@@ -231,16 +187,14 @@ class State(db.Model, Model):
     """
     __tablename__ = "state"
     id = db.Column(db.String(64), primary_key=True)
-    request_hash = db.Column(db.String(64), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, default=None)
     user = db.relationship('User', uselist=False)
     _current_card_seed = db.Column(db.Integer, nullable=False)
     _current_card_iter = db.Column(db.Integer, nullable=True, default=None)
     score = db.Column(db.Integer, default=0)
 
-    def __init__(self, request_hash: str):
+    def __init__(self):
         self.id = self.generate_id()
-        self.request_hash = request_hash
         self._current_card_seed = datetime.datetime.now().microsecond
 
     @hybrid_property
