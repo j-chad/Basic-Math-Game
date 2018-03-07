@@ -18,6 +18,7 @@ import pathlib
 import random
 import uuid
 import warnings
+from typing import Any, Callable, Dict, Optional
 
 import click
 import flask
@@ -57,7 +58,7 @@ bcrypt = flask_bcrypt.Bcrypt(app)
 ###########
 
 @app.shell_context_processor
-def make_shell_context() -> dict:
+def make_shell_context() -> Dict:
     """Helps In Development By Making All Variables Available For Testing"""
     return globals()
 
@@ -88,7 +89,7 @@ def init():
     db.session.commit()
 
 
-def state_handler(definition: callable) -> callable:
+def state_handler(definition: Callable) -> Callable:
     """Handles Simple State Handling Between Requests
 
     Each callable that is wrapped with this handler will recieve the current requests state.
@@ -171,7 +172,7 @@ def state_handler(definition: callable) -> callable:
 
 
 # IMPORTANT: This wrapper must be listed after @state_handler
-def require_login(definition: callable) -> callable:
+def require_login(definition: Callable) -> Callable:
     """Rejects All Unauthenticated Requests
 
     Apply this decorator to a route to require the user to be logged in.
@@ -207,7 +208,7 @@ class Model:
     """Base Class For All Models In This App"""
 
     @classmethod
-    def id_exists(cls: db.Model, id_) -> bool:
+    def id_exists(cls: db.Model, id_: Any) -> bool:
         """Return If `id_` exists
 
         Todo: Optimise Query
@@ -243,7 +244,7 @@ class State(db.Model, Model):
         self._current_card_seed = datetime.datetime.now().microsecond
 
     @hybrid_property
-    def card(self) -> Card:
+    def card(self) -> Optional['Card']:
         """Return The Currently Selected Card"""
         random.seed(self._current_card_seed)
         card_order = random.sample(self.user.cards, len(self.user.cards))
@@ -252,7 +253,7 @@ class State(db.Model, Model):
         else:
             return card_order[self._current_card_iter]
 
-    def next_card(self) -> Card:
+    def next_card(self) -> 'Card':
         """Change To The Next Card"""
         if self._current_card_iter is None or self._current_card_iter + 1 >= len(self.user.cards):
             # Generate new seed
@@ -283,7 +284,7 @@ class School(db.Model, Model):
     name = db.Column(db.String(20), nullable=False, unique=True)
     students = db.relationship('User', back_populates="school")
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.name = name
 
 
@@ -308,14 +309,14 @@ class User(db.Model, Model):
     school_id = db.Column(db.Integer, db.ForeignKey('school.id'), nullable=False)
     school = db.relationship('School', back_populates="students")
     state = db.relationship('State', back_populates="user")
-    username = db.Column(db.String(10), nullable=False)
-    _password = db.Column(db.Binary(60), nullable=False)
+    username = db.Column(db.String(20), nullable=False)
+    _password = db.Column(db.LargeBinary(60), nullable=False)
     salt = db.Column(db.String(24), nullable=False)
     highscore = db.Column(db.Integer, default=None)
 
     db.UniqueConstraint('username', 'school')
 
-    def __init__(self, username, password, school):
+    def __init__(self, username: str, password: str, school: School):
         self.username = username
         self.password = password
         self.school = school
@@ -326,7 +327,7 @@ class User(db.Model, Model):
         return self._password
 
     @password.setter
-    def password(self, plain_password) -> None:
+    def password(self, plain_password: str) -> None:
         """Enables Super Simple And Safe Password Saving
 
         Instead of hashing the password manually each time it needs to be changed,
@@ -385,8 +386,7 @@ class Card(db.Model, Model):
 
 class LoginForm(flask_wtf.FlaskForm):
     """The Form That Is Displayed When The User Attempts To Login"""
-    username = wtforms.StringField("Username",
-                                   validators=[wtforms.validators.DataRequired(), wtforms.validators.Length(max=10)])
+    username = wtforms.StringField("Username", validators=[wtforms.validators.DataRequired()])
     password = wtforms.PasswordField("Password", validators=[wtforms.validators.DataRequired()])
     school = QuerySelectField('School',
                               query_factory=lambda: School.query.order_by('name').all(),
@@ -417,7 +417,7 @@ class LoginForm(flask_wtf.FlaskForm):
 class RegisterForm(flask_wtf.FlaskForm):
     """The Form Displayed When The User Registers An Account"""
     username = wtforms.StringField("Username",
-                                   validators=[wtforms.validators.DataRequired(), wtforms.validators.Length(max=10)])
+                                   validators=[wtforms.validators.DataRequired(), wtforms.validators.Length(max=20)])
     password = wtforms.PasswordField("Password", validators=[wtforms.validators.DataRequired()])
     confirm_password = wtforms.PasswordField("Confirm Password", validators=[
         wtforms.validators.EqualTo('password', message="Passwords Do Not Match")])
@@ -427,9 +427,9 @@ class RegisterForm(flask_wtf.FlaskForm):
                               validators=[wtforms.validators.DataRequired()])
 
     @staticmethod
-    def validate_username(form, username_field):
+    def validate_username(form: flask_wtf.FlaskForm, username_field: wtforms.StringField):
         """Validates That The Username Is Available"""
-        if User.query.filter_by(username=username_field.data, school=form.school).first() is not None:
+        if User.query.filter_by(username=username_field.data, school=form.school.data).first() is not None:
             raise wtforms.validators.ValidationError("Username Taken")
 
 
