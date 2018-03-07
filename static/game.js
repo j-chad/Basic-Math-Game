@@ -62,7 +62,7 @@ function submit(){
                     if(response.highscore == null){
                         text = `New Highscore!`;
                     }else if(response.score > response.highscore){
-                        text = `New Highscore! (${response.score} > ${response.highscore})`;
+                        text = `New Highscore! (${response.score})`;
                     } else {
                         text = `You were ${response.highscore - response.score} points away from your highscore!`;
                     }
@@ -113,5 +113,6 @@ document.addEventListener('DOMContentLoaded', function () {
 document.addEventListener("keyup", event => {
     if (event.key === "Enter"
         && !swal.isVisible()
-        && document.getElementById('card-answer') === document.activeElement) submit();
+        && document.getElementById('card-answer') === document.activeElement
+        && document.getElementById('card-answer').value !== '') submit();
 });
