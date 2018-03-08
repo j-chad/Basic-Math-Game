@@ -38,6 +38,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///database.db'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["ENABLE_BROWSER_HASH_CHECK"] = False
 app.config["BCRYPT_LOG_ROUNDS"] = 15
+app.config["JSONIFY_PRETTYPRINT_REGULAR"] = False  # Fixes: https://github.com/pallets/flask/issues/2549
 
 # Generate Secret Configs If Not Present
 instance_folder = pathlib.Path('instance')
@@ -119,7 +120,8 @@ def state_handler(definition: Callable) -> Callable:
             db.session.add(state)
             db.session.commit()
         # pass state to definition and get response
-        response = definition(*args, **kwargs, state=state)
+        kwargs['state'] = state
+        response = definition(*args, **kwargs)
         # set cookies on response
         prepared_response = flask.make_response(response)
         prepared_response.set_cookie("game-state", value=state.id, httponly=True)
@@ -211,7 +213,8 @@ class State(db.Model, Model):
         """Change To The Next Card"""
         if self._current_card_iter is None or self._current_card_iter + 1 >= len(self.user.cards):
             # Generate new seed
-            self._current_card_seed = datetime.datetime.now().microsecond
+            if self._current_card_iter is not None:
+                self._current_card_seed = datetime.datetime.now().microsecond
             self._current_card_iter = 0
         else:
             self._current_card_iter += 1
@@ -271,6 +274,7 @@ class User(db.Model, Model):
     db.UniqueConstraint('username', 'school')
 
     def __init__(self, username: str, password: str, school: School):
+        self.salt = self.generate_salt()
         self.username = username
         self.password = password
         self.school = school
@@ -288,15 +292,18 @@ class User(db.Model, Model):
         this function allows us to simply specify `User.password = "newpassword"`.
         And the password will be converted and saved appropriately.
         """
-        self.salt = base64.urlsafe_b64encode(uuid.uuid4().bytes).decode()
         salted_password = plain_password + self.salt
-        self._password = bcrypt.generate_password_hash(salted_password)
+        self._password = bcrypt.generate_password_hash(salted_password, rounds=app.config['BCRYPT_LOG_ROUNDS'])
 
     @hybrid_method
     def check_password(self, plain_password: str) -> bool:
         """Checks If The User Entered The Right Password"""
         salted_password = plain_password + self.salt
         return bcrypt.check_password_hash(self.password, salted_password)
+
+    @staticmethod
+    def generate_salt():
+        return base64.urlsafe_b64encode(uuid.uuid4().bytes).decode()
 
 
 class Card(db.Model, Model):
@@ -456,6 +463,8 @@ def cards(state: State) -> flask.Response:
 @require_login
 def play(state: State) -> flask.Response:
     """The Actual Game"""
+    if len(state.user.cards) < 1:
+        flask.abort(400)
     state.score = 0
     state._current_card_iter = None
     db.session.commit()
@@ -465,7 +474,7 @@ def play(state: State) -> flask.Response:
 @app.route('/api/add_card', methods=('POST',))
 @state_handler
 @require_login
-def add_card(state: State) -> flask.Response:
+def add_card_api(state: State) -> flask.Response:
     """Adds A Card To Logged On User
 
     POST Parameters:
@@ -485,7 +494,7 @@ def add_card(state: State) -> flask.Response:
 @app.route('/api/remove_card', methods=('POST',))
 @state_handler
 @require_login
-def remove_card(state: State) -> flask.Response:
+def remove_card_api(state: State) -> flask.Response:
     """Removes A Card From Logged On User
 
     POST Parameters:
@@ -496,7 +505,7 @@ def remove_card(state: State) -> flask.Response:
         403: You tried to delete someone else's card :(
     """
     card = Card.query.get(flask.request.form['id'])
-    if card in state.user.cards:
+    if card is not None and card in state.user.cards:
         db.session.delete(card)
         db.session.commit()
         return flask.make_response('success', 200)
@@ -507,7 +516,7 @@ def remove_card(state: State) -> flask.Response:
 @app.route('/api/get_card', methods=('GET',))
 @state_handler
 @require_login
-def get_card(state: State) -> flask.Response:
+def get_card_api(state: State) -> flask.Response:
     """Gets The Currently Selected Card For User
 
     GET Parameters:
@@ -519,9 +528,14 @@ def get_card(state: State) -> flask.Response:
             "question": card.question
         }
     """
-    if int(flask.request.args.get('n')) == 1:
-        card = state.next_card()
+    if int(flask.request.args.get('n', 0)) == 1:
+        if len(state.user.cards) < 1:
+            return flask.make_response('', 204)
+        else:
+            card = state.next_card()
     else:
+        if state.card is None:
+            return flask.make_response('', 204)
         card = state.card
     return flask.jsonify(dict(id=card.id, question=card.question))
 
@@ -529,7 +543,7 @@ def get_card(state: State) -> flask.Response:
 @app.route('/api/answer_card', methods=('POST',))
 @state_handler
 @require_login
-def answer_card(state: State) -> flask.Response:
+def answer_card_api(state: State) -> flask.Response:
     """Verifys A User's Answer
 
     POST Parameters:
@@ -545,6 +559,8 @@ def answer_card(state: State) -> flask.Response:
     """
     answer = flask.request.form['a']
     answer_formatted = answer.lower().strip()
+    if state.card is None:
+        flask.abort(400)
     if answer_formatted == state.card.answer.lower():
         state.score += 1
         state.next_card()
