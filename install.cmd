@@ -1,7 +1,7 @@
 ECHO off
 TITLE Basic-Math-Game Installer
 
-git clone https://github.com/j-chad/Basic-Math-Game.git
+
 cd Basic-Math-Game
 
 pip3 install --user virtualenv
