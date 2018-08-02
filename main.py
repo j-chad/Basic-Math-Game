@@ -3,6 +3,10 @@
 
 """A Basic Card Game Using Flask"""
 
+############
+# METADATA #
+############
+
 __author__ = "Jackson Chadfield <chadfield.jackson@gmail.com>"
 
 ###########
@@ -34,10 +38,10 @@ from wtforms.ext.sqlalchemy.fields import QuerySelectField
 ######################
 
 app = flask.Flask(__name__, instance_relative_config=True)
-app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///database.db'
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_DATABASE_URI"] = 'sqlite:///database.db'  # Specify Where The Database Is
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False  # Tracking Modifications Adds Unnecessary Overhead
 app.config["ENABLE_BROWSER_HASH_CHECK"] = False
-app.config["BCRYPT_LOG_ROUNDS"] = 15
+app.config["BCRYPT_LOG_ROUNDS"] = 15  # Number Of Rounds To Hash With Bcrypt
 app.config["JSONIFY_PRETTYPRINT_REGULAR"] = False  # Fixes: https://github.com/pallets/flask/issues/2549
 
 # Generate Secret Configs If Not Present
@@ -50,8 +54,8 @@ if not instance_folder.is_dir():
 app.config.from_pyfile('config.py')
 
 # Load Plugins
-db = flask_sqlalchemy.SQLAlchemy(app)
-bcrypt = flask_bcrypt.Bcrypt(app)
+db = flask_sqlalchemy.SQLAlchemy(app)  # ORM - Handles Database Operations
+bcrypt = flask_bcrypt.Bcrypt(app)  # Handles Password Hashing
 
 
 ###########
@@ -65,7 +69,7 @@ def make_shell_context() -> Dict:
 
 
 @app.cli.command()
-def init():
+def init() -> None:
     """Performs All Functions Needed To Initialise The App
 
     This Includes:
@@ -93,7 +97,7 @@ def init():
 def state_handler(definition: Callable) -> Callable:
     """Handles Simple State Handling Between Requests
 
-    Each callable that is wrapped with this handler will recieve the current requests state.
+    Each callable that is wrapped with this handler will receive the current requests state.
     When the callable has returned its response, it is intercepted and assigned cookies.
 
     Args:
@@ -112,17 +116,17 @@ def state_handler(definition: Callable) -> Callable:
         """
         state_id = flask.request.cookies.get("game-state")
         if state_id is not None and State.id_exists(state_id):
-            # if state is valid, get it from the database
+            # If state is valid, get it from the database
             state = State.query.get(state_id)
         else:
-            # if it isn't valid, create a new State object
+            # If it isn't valid, create a new State object
             state = State()
             db.session.add(state)
             db.session.commit()
-        # pass state to definition and get response
+        # Pass state to definition and get response
         kwargs['state'] = state
         response = definition(*args, **kwargs)
-        # set cookies on response
+        # Set cookies on response
         prepared_response = flask.make_response(response)
         prepared_response.set_cookie("game-state", value=state.id, httponly=True)
         return prepared_response
@@ -132,7 +136,7 @@ def state_handler(definition: Callable) -> Callable:
 
 # IMPORTANT: This wrapper must be listed after @state_handler
 def require_login(definition: Callable) -> Callable:
-    """Rejects All Unauthenticated Requests
+    """Convenience Method That Rejects All Unauthenticated Requests
 
     Apply this decorator to a route to require the user to be logged in.
     All unauthenticated responses will return a 403 FORBIDDEN code.
@@ -151,10 +155,10 @@ def require_login(definition: Callable) -> Callable:
 
     @functools.wraps(definition)
     def wrapper(state: State, *args, **kwargs) -> flask.Response:
-        if state.user is None:
+        if state.user is None:  # If No User Exists In State
             flask.abort(403)
         else:
-            return definition(*args, **kwargs, state=state)
+            return definition(*args, **kwargs, state=state)  # Continue Request
 
     return wrapper
 
@@ -163,19 +167,19 @@ def require_login(definition: Callable) -> Callable:
 # DATABASE #
 ############
 
-class Model:
+class CommonModelMixin:
     """Base Class For All Models In This App"""
 
     @classmethod
     def id_exists(cls: db.Model, id_: Any) -> bool:
         """Return If `id_` exists
 
-        Todo: Optimise Query
+        This is a mixin class inherited by all tables, allowing for easy, extensibility
         """
         return cls.query.get(id_) is not None
 
 
-class State(db.Model, Model):
+class State(db.Model, CommonModelMixin):
     """Represents The State Of Each Person Using The App
 
     Each User can have multiple states. The State simply represents their current session.
@@ -201,7 +205,11 @@ class State(db.Model, Model):
 
     @hybrid_property
     def card(self) -> Optional['Card']:
-        """Return The Currently Selected Card"""
+        """Return The Currently Selected Card
+
+        Uses the states seed to ensure that the same card is received
+        """
+
         random.seed(self._current_card_seed)
         card_order = random.sample(self.user.cards, len(self.user.cards))
         if self._current_card_iter is None:
@@ -222,19 +230,20 @@ class State(db.Model, Model):
         return self.card
 
     @staticmethod
-    def generate_id():
+    def generate_id() -> str:
+        """Generates A Random ID"""
         while True:
             potential_id = hashlib.sha256(os.urandom(128)).hexdigest()
             if not State.id_exists(potential_id):
                 return potential_id
 
 
-class School(db.Model, Model):
+class School(db.Model, CommonModelMixin):
     """Represents A School
 
     Columns:
         id: Primary key
-        name: Name of the school, Who would have thought?
+        name: Name of the school
     """
     __tablename__ = "school"
     id = db.Column(db.Integer, primary_key=True)
@@ -245,13 +254,13 @@ class School(db.Model, Model):
         self.name = name
 
 
-class User(db.Model, Model):
+class User(db.Model, CommonModelMixin):
     """Represents a User
 
     Columns:
         id: Primary key
         school_id: Identifies the School the user is associated with
-        username: The name of the user?
+        username: The name of the user
         _password: The password stored as a bcrypt hash
         salt: The salt used to hash the password
         highscore: The users best score
@@ -271,7 +280,7 @@ class User(db.Model, Model):
     salt = db.Column(db.String(24), nullable=False)
     highscore = db.Column(db.Integer, default=None)
 
-    db.UniqueConstraint('username', 'school')
+    db.UniqueConstraint('username', 'school')  # Create A Composite Constraint
 
     def __init__(self, username: str, password: str, school: School):
         self.salt = self.generate_salt()
@@ -281,7 +290,10 @@ class User(db.Model, Model):
 
     @hybrid_property
     def password(self) -> str:
-        """This enables abstraction away from the _password"""
+        """This enables abstraction away from the _password
+
+        This is a getter property that is integrated in the database as a hybrid_property
+        """
         return self._password
 
     @password.setter
@@ -291,6 +303,8 @@ class User(db.Model, Model):
         Instead of hashing the password manually each time it needs to be changed,
         this function allows us to simply specify `User.password = "newpassword"`.
         And the password will be converted and saved appropriately.
+
+        Defines the setter for the hybrid_property `password`
         """
         salted_password = plain_password + self.salt
         self._password = bcrypt.generate_password_hash(salted_password, rounds=app.config['BCRYPT_LOG_ROUNDS'])
@@ -303,10 +317,11 @@ class User(db.Model, Model):
 
     @staticmethod
     def generate_salt():
+        """Generates a salt for use in hashing the password"""
         return base64.urlsafe_b64encode(uuid.uuid4().bytes).decode()
 
 
-class Card(db.Model, Model):
+class Card(db.Model, CommonModelMixin):
     """Represents A User's Card
 
     Columns:
@@ -324,11 +339,14 @@ class Card(db.Model, Model):
 
     def __init__(self, user: User, question: str, answer: str):
         self.user = user
-        self.question = question.strip()
-        self.answer = answer.strip()
+        self.question = question.strip()  # Get rid of whitespace on either side of the text
+        self.answer = answer.strip()  # Same as above
 
-    def render(self):
-        # Todo: Remove and replace in jinja
+    def render(self) -> str:
+        """Returns a html string that is displayed in the game
+
+        This is probably not xss safe but eh, it is a *basic* math game
+        """
         return "<div class='container'>" \
                "<div class='title'>" \
                "<h1 class='item-text'>{q}</h1>" \
@@ -347,14 +365,16 @@ class Card(db.Model, Model):
 
 class LoginForm(flask_wtf.FlaskForm):
     """The Form That Is Displayed When The User Attempts To Login"""
-    username = wtforms.StringField("Username", validators=[wtforms.validators.DataRequired()])
-    password = wtforms.PasswordField("Password", validators=[wtforms.validators.DataRequired()])
-    school = QuerySelectField('School',
-                              query_factory=lambda: School.query.order_by('name').all(),
-                              get_label='name',
-                              allow_blank=False,
-                              get_pk=lambda a: a.id,
-                              validators=[wtforms.validators.DataRequired()])
+    username = wtforms.StringField("Username", validators=[
+        wtforms.validators.DataRequired()
+    ])
+    password = wtforms.PasswordField("Password", validators=[
+        wtforms.validators.DataRequired()
+    ])
+    school = QuerySelectField('School', query_factory=lambda: School.query.order_by('name').all(), get_label='name',
+                              get_pk=lambda a: a.id, validators=[
+            wtforms.validators.DataRequired()
+        ])
     user = None
 
     def validate(self) -> bool:
@@ -363,13 +383,13 @@ class LoginForm(flask_wtf.FlaskForm):
             return False
         else:
             user = User.query.filter_by(username=self.username.data, school_id=self.school.data.id).first()
-            if user is None:
+            if user is None:  # User doesn't exist
                 self.username.errors.append("Incorrect Username Or Password")
                 return False
-            elif not user.check_password(self.password.data):
+            elif not user.check_password(self.password.data):  # Password Incorrect
                 self.username.errors.append("Incorrect Username Or Password")
                 return False
-            else:
+            else:  # Password Correct!
                 self.user = user
                 return True
 
@@ -377,11 +397,16 @@ class LoginForm(flask_wtf.FlaskForm):
 # noinspection PyUnusedLocal
 class RegisterForm(flask_wtf.FlaskForm):
     """The Form Displayed When The User Registers An Account"""
-    username = wtforms.StringField("Username",
-                                   validators=[wtforms.validators.DataRequired(), wtforms.validators.Length(max=20)])
-    password = wtforms.PasswordField("Password", validators=[wtforms.validators.DataRequired()])
+    username = wtforms.StringField("Username", validators=[
+        wtforms.validators.DataRequired(),
+        wtforms.validators.Length(max=20)
+    ])
+    password = wtforms.PasswordField("Password", validators=[
+        wtforms.validators.DataRequired()
+    ])
     confirm_password = wtforms.PasswordField("Confirm Password", validators=[
-        wtforms.validators.EqualTo('password', message="Passwords Do Not Match")])
+        wtforms.validators.EqualTo('password', message="Passwords Do Not Match")
+    ])
     school = QuerySelectField('School',
                               query_factory=lambda: School.query.order_by('name').all(),
                               get_label='name', allow_blank=False, get_pk=lambda a: a.id,
@@ -401,7 +426,10 @@ class RegisterForm(flask_wtf.FlaskForm):
 @app.route('/', methods=('GET',))
 @state_handler
 def index(state: State) -> flask.Response:
-    """Index Page. Nothing Special Here"""
+    """Index Page. Nothing Special Here
+
+    If user is logged in redirect to cards route
+    """
     if state.user is not None:
         return flask.redirect('/cards')
     else:
@@ -413,15 +441,15 @@ def index(state: State) -> flask.Response:
 def login(state: State) -> flask.Response:
     """Login Page"""
     if state.user is not None:
-        return flask.redirect('/cards')
-    form = LoginForm()
-    if form.validate_on_submit():
+        return flask.redirect('/cards')  # If user is already logged in - Redirect to /cards
+    form = LoginForm()  # Create a form
+    if form.validate_on_submit():  # If Form has been submitted and is valid
         user = User.query.filter_by(username=form.username.data, school=form.school.data).first()
-        state.user = user
+        state.user = user  # Update User i.e. Authenticate
         db.session.commit()
-        return flask.redirect('/cards')
+        return flask.redirect('/cards')  # Redirect to /cards
     else:
-        return flask.render_template('login.jinja', form=form)
+        return flask.render_template('login.jinja', form=form)  # If GET and not logged in
 
 
 @app.route('/register', methods=('GET', 'POST'))
@@ -429,14 +457,14 @@ def login(state: State) -> flask.Response:
 def register(state: State) -> flask.Response:
     """Register Page"""
     if state.user is not None:
-        return flask.redirect('/cards')
-    form = RegisterForm()
-    if form.validate_on_submit():
-        user = User(form.username.data, form.password.data, form.school.data)
+        return flask.redirect('/cards')  # If user is already logged in - Redirect to /cards
+    form = RegisterForm()  # Create a form
+    if form.validate_on_submit():  # If Form has been submitted and is valid
+        user = User(form.username.data, form.password.data, form.school.data)  # Create a new user
         db.session.add(user)
-        state.user = user
+        state.user = user  # Update the state to use this user i.e. Authenticate
         db.session.commit()
-        return flask.redirect('/cards')
+        return flask.redirect('/cards')  # Redirect to /cards
     else:
         return flask.render_template('register.jinja', form=form)
 
@@ -463,10 +491,10 @@ def cards(state: State) -> flask.Response:
 @require_login
 def play(state: State) -> flask.Response:
     """The Actual Game"""
-    if len(state.user.cards) < 1:
+    if len(state.user.cards) == 0:  # If there are no cards
         flask.abort(400)
-    state.score = 0
-    state._current_card_iter = None
+    state.score = 0  # Reset Score
+    state._current_card_iter = None  # Reset how many iterations have been played
     db.session.commit()
     return flask.render_template('game.jinja', state=state)
 
@@ -477,18 +505,22 @@ def play(state: State) -> flask.Response:
 def add_card_api(state: State) -> flask.Response:
     """Adds A Card To Logged On User
 
+    This route is intended for use by xhr/ajax
+
     POST Parameters:
         q: The question that should be on the card
         a: The answer to the question
 
     Returns: The HTML of the requested card
     """
+    # Get variables
     q = flask.request.form['q']
     a = flask.request.form['a']
-    card = Card(state.user, q, a)
+
+    card = Card(state.user, q, a)  # Create card
     db.session.add(card)
     db.session.commit()
-    return flask.make_response(card.render(), 201)
+    return flask.make_response(card.render(), 201)  # Return html of card
 
 
 @app.route('/api/remove_card', methods=('POST',))
@@ -497,16 +529,18 @@ def add_card_api(state: State) -> flask.Response:
 def remove_card_api(state: State) -> flask.Response:
     """Removes A Card From Logged On User
 
+    This route is intended for use by xhr/ajax
+
     POST Parameters:
         id: The id of the Card to remove
 
     Returns:
         200: Success
-        403: You tried to delete someone else's card :(
+        403: You tried to delete someone else's card. SAD!
     """
     card = Card.query.get(flask.request.form['id'])
     if card is not None and card in state.user.cards:
-        db.session.delete(card)
+        db.session.delete(card)  # Delete card
         db.session.commit()
         return flask.make_response('success', 200)
     else:
@@ -519,21 +553,24 @@ def remove_card_api(state: State) -> flask.Response:
 def get_card_api(state: State) -> flask.Response:
     """Gets The Currently Selected Card For User
 
+    This route is intended for use by xhr/ajax
+
     GET Parameters:
         n: Whether to fetch the next card. If n!=1: Use Current Card
+           Default: 0
 
-    Returns:
+    Returns: JSON
         {
             "id": card.id,
             "question": card.question
         }
     """
-    if int(flask.request.args.get('n', 0)) == 1:
-        if len(state.user.cards) < 1:
+    if int(flask.request.args.get('n', 0)):  # Whether to fetch the next card
+        if len(state.user.cards) == 0:  # No Cards
             return flask.make_response('', 204)
         else:
-            card = state.next_card()
-    else:
+            card = state.next_card()  # Get next card
+    else:  # Do not fetch next card
         if state.card is None:
             return flask.make_response('', 204)
         card = state.card
@@ -544,43 +581,46 @@ def get_card_api(state: State) -> flask.Response:
 @state_handler
 @require_login
 def answer_card_api(state: State) -> flask.Response:
-    """Verifys A User's Answer
+    """Verify A User's Answer
+
+    This route is intended for use by xhr/ajax
 
     POST Parameters:
         a: The answer to test against
 
     Returns:
-        dict with the fields:
+        JSON with the fields:
             correct (bool): indicates whether the answer was correct
             score (int): The current score of the User
         if correct is False the following fields will also be included:
             answer (str): The correct answer
             highscore (int): The highscore of the User
     """
-    answer = flask.request.form['a']
-    answer_formatted = answer.lower().strip()
+    answer = flask.request.form['a']  # Get the user-submitted answer
+    answer_formatted = answer.lower().strip()  # Normalise the answer
     if state.card is None:
         flask.abort(400)
-    if answer_formatted == state.card.answer.lower():
+    if answer_formatted == state.card.answer.lower():  # If user was correct
         state.score += 1
         state.next_card()
         db.session.commit()
         return flask.jsonify({
             "correct": True,
-            "score"  : state.score
+            "score": state.score
         })
-    else:
+    else:  # If user was incorrect
         payload = {
-            "correct"  : False,
-            "score"    : state.score,
-            "answer"   : state.card.answer,
+            "correct": False,
+            "score": state.score,
+            "answer": state.card.answer,
             "highscore": state.user.highscore,
         }
-        if state.user.highscore is None or state.score > state.user.highscore:
-            state.user.highscore = state.score
+        if state.user.highscore is None or state.score > state.user.highscore:  # If it is a new highscore
+            state.user.highscore = state.score  # Update highscore
             db.session.commit()
         return flask.jsonify(payload)
 
 
+# If run directly
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=80, debug=True)
+    app.run(host="0.0.0.0", port=80, debug=True)  # Run app using dev server

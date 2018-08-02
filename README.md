@@ -1,5 +1,7 @@
 # Basic Math Game
 
+Tested on Python 3.6
+
 This is a **very** basic flashcard web game.
 
 It was made for 
