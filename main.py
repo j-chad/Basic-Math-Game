@@ -187,21 +187,21 @@ class State(db.Model, CommonModelMixin):
     Columns:
         id: The primary key. This is sent to the browser as a cookie to identify across requests
         user_id: Pretty self explanatory. Holds the identifier for the user if they are logged in.
-        _current_card_seed: The initial seed for the randomness to shuffle the cards
-        _current_card_iter: The current card of the shuffled set. (zero indexed)
+        __current_card_seed: The initial seed for the randomness to shuffle the cards
+        __current_card_iter: The current card of the shuffled set. (zero indexed)
         score: The score of the current user
     """
     __tablename__ = "state"
     id = db.Column(db.String(64), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, default=None)
     user = db.relationship('User', uselist=False)
-    _current_card_seed = db.Column(db.Integer, nullable=False)
-    _current_card_iter = db.Column(db.Integer, nullable=True, default=None)
+    __current_card_seed = db.Column(db.Integer, nullable=False)
+    __current_card_iter = db.Column(db.Integer, nullable=True, default=None)
     score = db.Column(db.Integer, default=0)
 
     def __init__(self):
         self.id = self.generate_id()
-        self._current_card_seed = datetime.datetime.now().microsecond
+        self.__current_card_seed = datetime.datetime.now().microsecond
 
     @hybrid_property
     def card(self) -> Optional['Card']:
@@ -210,24 +210,28 @@ class State(db.Model, CommonModelMixin):
         Uses the states seed to ensure that the same card is received
         """
 
-        random.seed(self._current_card_seed)
+        random.seed(self.__current_card_seed)
         card_order = random.sample(self.user.cards, len(self.user.cards))
-        if self._current_card_iter is None:
+        if self.__current_card_iter is None:
             return None
         else:
-            return card_order[self._current_card_iter]
+            return card_order[self.__current_card_iter]
 
     def next_card(self) -> 'Card':
         """Change To The Next Card"""
-        if self._current_card_iter is None or self._current_card_iter + 1 >= len(self.user.cards):
+        if self.__current_card_iter is None or self.__current_card_iter + 1 >= len(self.user.cards):
             # Generate new seed
-            if self._current_card_iter is not None:
-                self._current_card_seed = datetime.datetime.now().microsecond
-            self._current_card_iter = 0
+            if self.__current_card_iter is not None:
+                self.__current_card_seed = datetime.datetime.now().microsecond
+            self.__current_card_iter = 0
         else:
-            self._current_card_iter += 1
+            self.__current_card_iter += 1
         db.session.commit()
         return self.card
+
+    def reset_card(self) -> None:
+        """Sets The Iter To None"""
+        self.__current_card_iter = None
 
     @staticmethod
     def generate_id() -> str:
@@ -261,7 +265,7 @@ class User(db.Model, CommonModelMixin):
         id: Primary key
         school_id: Identifies the School the user is associated with
         username: The name of the user
-        _password: The password stored as a bcrypt hash
+        __password: The password stored as a bcrypt hash
         salt: The salt used to hash the password
         highscore: The users best score
 
@@ -276,7 +280,7 @@ class User(db.Model, CommonModelMixin):
     school = db.relationship('School', back_populates="students")
     state = db.relationship('State', back_populates="user")
     username = db.Column(db.String(20), nullable=False)
-    _password = db.Column(db.LargeBinary(60), nullable=False)
+    __password = db.Column(db.LargeBinary(60), nullable=False)
     salt = db.Column(db.String(24), nullable=False)
     highscore = db.Column(db.Integer, default=None)
 
@@ -290,11 +294,11 @@ class User(db.Model, CommonModelMixin):
 
     @hybrid_property
     def password(self) -> str:
-        """This enables abstraction away from the _password
+        """This enables abstraction away from the __password
 
         This is a getter property that is integrated in the database as a hybrid_property
         """
-        return self._password
+        return self.__password
 
     @password.setter
     def password(self, plain_password: str) -> None:
@@ -307,7 +311,7 @@ class User(db.Model, CommonModelMixin):
         Defines the setter for the hybrid_property `password`
         """
         salted_password = plain_password + self.salt
-        self._password = bcrypt.generate_password_hash(salted_password, rounds=app.config['BCRYPT_LOG_ROUNDS'])
+        self.__password = bcrypt.generate_password_hash(salted_password, rounds=app.config['BCRYPT_LOG_ROUNDS'])
 
     @hybrid_method
     def check_password(self, plain_password: str) -> bool:
@@ -494,7 +498,7 @@ def play(state: State) -> flask.Response:
     if len(state.user.cards) == 0:  # If there are no cards
         flask.abort(400)
     state.score = 0  # Reset Score
-    state._current_card_iter = None  # Reset how many iterations have been played
+    state.reset_card()  # Reset how many iterations have been played
     db.session.commit()
     return flask.render_template('game.jinja', state=state)
 

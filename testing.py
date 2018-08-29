@@ -310,7 +310,7 @@ class ModelTesting(BaseTestCase):
         main.db.session.add_all((state_obj, user_obj))
 
         state_obj.user = user_obj
-        state_obj._current_card_seed = 259720  # [2, 3, 4, 1]
+        state_obj._State__current_card_seed = 259720  # [2, 3, 4, 1]
         main.db.session.add(main.Card(state_obj.user, "card 1", "1"))
         card_2 = main.Card(state_obj.user, "card 2", "2")
         main.db.session.add(card_2)
@@ -320,7 +320,7 @@ class ModelTesting(BaseTestCase):
         main.db.session.commit()
 
         self.assertIs(state_obj.next_card(), card_2)
-        self.assertIsNotNone(state_obj._current_card_iter)
+        self.assertIsNotNone(state_obj._State__current_card_iter)
         self.assertIs(state_obj.card, card_2)
 
     def test_user_check_password_true(self):
@@ -537,7 +537,7 @@ class APITesting(BaseTestCase):
             main.Card(user_obj, 'q5', 'a5')
         ))
         state_obj.user = user_obj
-        state_obj._current_card_seed = 608731  # [3, 4, 5, 2, 1]
+        state_obj._State__current_card_seed = 608731  # [3, 4, 5, 2, 1]
         main.db.session.commit()
         print(card_obj_1.id, card_obj_2.id)
 
@@ -570,7 +570,7 @@ class APITesting(BaseTestCase):
                 self.assertEqual(response.json['id'], card_obj_2.id)
 
         with self.subTest('overflow iterator'):
-            state_obj._current_card_iter = 5
+            state_obj._State__current_card_iter = 5
             main.db.session.commit()
             with self.client as c:
                 c.set_cookie('localhost', 'game-state', state_obj.id)
@@ -601,7 +601,7 @@ class APITesting(BaseTestCase):
         card_obj = main.Card(user_obj, 'q1', 'a1')
         main.db.session.add_all((state_obj, user_obj, card_obj))
         state_obj.user = user_obj
-        state_obj._current_card_iter = 0
+        state_obj._State__current_card_iter = 0
         main.db.session.commit()
 
         with self.client as c:
@@ -617,7 +617,7 @@ class APITesting(BaseTestCase):
         card_obj = main.Card(user_obj, 'q1', 'a1')
         main.db.session.add_all((state_obj, user_obj, card_obj))
         state_obj.user = user_obj
-        state_obj._current_card_iter = 0
+        state_obj._State__current_card_iter = 0
         main.db.session.commit()
 
         with self.client as c:
@@ -635,7 +635,7 @@ class APITesting(BaseTestCase):
         card_obj = main.Card(user_obj, 'q1', 'a1')
         main.db.session.add_all((state_obj, user_obj, card_obj))
         state_obj.user = user_obj
-        state_obj._current_card_iter = 0
+        state_obj._State__current_card_iter = 0
         main.db.session.commit()
 
         with self.client as c:
