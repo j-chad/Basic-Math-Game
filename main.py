@@ -187,8 +187,8 @@ class State(db.Model, CommonModelMixin):
     Columns:
         id: The primary key. This is sent to the browser as a cookie to identify across requests
         user_id: Pretty self explanatory. Holds the identifier for the user if they are logged in.
-        __current_card_seed: The initial seed for the randomness to shuffle the cards
-        __current_card_iter: The current card of the shuffled set. (zero indexed)
+        __current_card_seed: The initial seed for the randomness to shuffle the cards - private variable
+        __current_card_iter: The current card of the shuffled set. (zero indexed) - private variable
         score: The score of the current user
     """
     __tablename__ = "state"
@@ -265,7 +265,7 @@ class User(db.Model, CommonModelMixin):
         id: Primary key
         school_id: Identifies the School the user is associated with
         username: The name of the user
-        __password: The password stored as a bcrypt hash
+        __password: The password stored as a bcrypt hash - private variable
         salt: The salt used to hash the password
         highscore: The users best score
 
@@ -294,9 +294,10 @@ class User(db.Model, CommonModelMixin):
 
     @hybrid_property
     def password(self) -> str:
-        """This enables abstraction away from the __password
+        """This enables abstraction away from the private variable __password
 
-        This is a getter property that is integrated in the database as a hybrid_property
+        This is a getter property that is integrated in the database as a hybrid_property, which allows
+        it to be executed by the database as well as the application
         """
         return self.__password
 
