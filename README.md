@@ -1,6 +1,6 @@
 <p align="center">
   <a href="" rel="noopener">
- <img width=200px height=200px src="static/logo.svg" alt="Project logo"></a>
+ <img width=369px height=200px src="static/logo.svg" alt="Project logo"></a>
 </p>
 
 <h3 align="center">Prodigy</h3>
